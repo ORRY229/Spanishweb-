@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+   <meta charset="UTF-T-8">
+
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+   <title>Interactive Spanish Phrasebook</title>
+
+   <script src="https://cdn.tailwindcss.com"></script>
+
+   <!-- Visualization & Content Choices:
+
+   - Report Info: List of Spanish phrases and English translations, categorized.
+
+   - Goal: Inform, Organize, Quick Lookup, Enhance Understanding.
+
+   - Viz/Presentation Method:
+
+       - Categories: Interactive filter buttons (HTML/Tailwind + JS).
+`
+       - Phrases: Dynamically generated cards (HTML/Tailwind + JS), each showing Spanish and English.
+
+       - Search: Text input field (HTML/Tailwind + JS).
+
+       - Phrase Expansion: Modal display for LLM-generated content (HTML/Tailwind + JS).
+
+   - Interaction:
+
+       - Category Buttons: Click to filter phrases by category. "Show All" resets filters.
+
+       - Search Input: Real-time filtering of phrases based on typed text (searches both languages).
+
+       - Expand Phrase Button: Click to trigger LLM call and display detailed explanation/dialogue in a modal.
+
+   - Justification: This combination provides easy browsing by topic and direct searching, making it efficient for users to find the phrases they need. The LLM integration adds a "wow" factor by providing dynamic, contextual learning beyond simple translation, making the phrases more consumable and understandable. No complex visualizations are required for this type of data.
+
+   - Library/Method: Vanilla JavaScript for DOM manipulation, filtering, and API calls. Tailwind CSS for styling.
+
+   - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+   <style>
+
+       body {
+
+           font-family: 'Inter', sans-serif;
+
+       }
+
+       .phrase-card {
+
+           transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+
+       }
+
+       .phrase-card:hover {
+
+           transform: translateY(-4px);
+
+           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+       }
+
+       .filter-button.active {
+
+           background-color: #0D9488; /* teal-600 */
+
+           color: white;
+
+       }
+
+       .filter-button {
+
+           transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+
+       }
+
+        /* Custom scrollbar for webkit browsers */
+
+       ::-webkit-scrollbar {
+
+           width: 8px;
+
+       }
+
+       ::-webkit-scrollbar-track {
+
+           background: #f1f1f1;
+
+           border-radius: 10px;
+
+       }
+
+       ::-webkit-scrollbar-thumb {
+
+           background: #0D9488; /* teal-600 */
+
+           border-radius: 10px;
+
+       }
+
+       ::-webkit-scrollbar-thumb:hover {
+
+           background: #0F766E; /* teal-700 */
+
+       }
+
+
+       /* Modal specific styles */
+
+       .modal-overlay {
+
+           position: fixed;
+
+           top: 0;
+
+           left: 0;
+
+           width: 100%;
+
+           height: 100%;
+
+           background-color: rgba(0, 0, 0, 0.6);
+
+           display: flex;
+
+           justify-content: center;
+
+           align-items: center;
+
+           z-index: 1000;
+
+           opacity: 0;
+
+           visibility: hidden;
+
+           transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+
+       }
+
+       .modal-overlay.show {
+
+           opacity: 1;
+
+           visibility: visible;
+
+       }
+
+       .modal-content {
+
+           background-color: white;
+
+           padding: 2rem;
+
+           border-radius: 0.75rem;
+
+           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+           max-width: 90%;
+
+           max-height: 90%;
+
+           overflow-y: auto;
+
+           position: relative;
+
+           transform: translateY(20px);
+
+           transition: transform 0.3s ease-in-out;
+
+       }
+
+       .modal-overlay.show .modal-content {
+
+           transform: translateY(0);
+
+       }
+
+       .close-button {
+
+           position: absolute;
+
+           top: 1rem;
+
+           right: 1rem;
+
+           background: none;
+
+           border: none;
+
+           font-size: 1.5rem;
+
+           cursor: pointer;
+
+           color: #4A5568; /* gray-700 */
+
+       }
+
+       .loading-spinner {
+
+           border: 4px solid #f3f3f3;
+
+           border-top: 4px solid #0D9488; /* teal-600 */
+
+           border-radius: 50%;
+
+           width: 40px;
+
+           height: 40px;
+
+           animation: spin 1s linear infinite;
+
+           margin: 20px auto;
+
+       }
+
+       @keyframes spin {
+
+           0% { transform: rotate(0deg); }
+
+           100% { transform: rotate(360deg); }
+
+       }
+
+   </style>
+
+</head>
+
+<body class="bg-stone-100 text-stone-800 min-h-screen flex flex-col">
+
+
+   <header class="bg-teal-700 text-white shadow-lg sticky top-0 z-50">
+
+       <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+           <h1 class="text-2xl sm:text-3xl font-bold text-center">Interactive Spanish Phrasebook</h1>
+
+           <p class="text-center text-teal-200 mt-1 text-sm sm:text-base">Explore, filter, and search useful Spanish phrases for various situations.</p>
+
+       </div>
+
+   </header>
+
+
+   <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+
+       <div class="mb-8 p-6 bg-white rounded-xl shadow-md">
+
+           <h2 class="text-xl font-semibold text-teal-700 mb-3">Filters and Search</h2>
+
+           <p class="text-sm text-stone-600 mb-4">
+
+               Welcome to the Interactive Spanish Phrasebook. Use the category buttons to filter phrases by topic or use the search bar to find specific phrases in Spanish or English. We hope this tool is very useful for you!
+
+           </p>
+
+           <div class="mb-6">
+
+               <input type="text" id="searchInput" placeholder="Search phrases (Spanish or English)..." class="w-full p-3 border border-stone-300 rounded-lg shadow-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow">
+
+           </div>
+
+           <div id="categoryFilters" class="flex flex-wrap gap-2 sm:gap-3 justify-center">
+
+           </div>
+
+       </div>
+
+
+       <div id="phraseList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+
+       </div>
+
+       <div id="noResults" class="hidden text-center py-10">
+
+           <p class="text-xl text-stone-500">😔 No se encontraron frases que coincidan con tu búsqueda o filtro.</p>
+
+           <p class="text-stone-400 mt-2">Intenta con otras palabras clave o ajusta los filtros.</p>
+
+       </div>
+
+   </main>
+
+
+   <footer class="bg-stone-800 text-stone-300 py-6 text-center mt-auto">
+
+       <p class="text-sm">&copy; 2025 Guía Interactiva de Frases. Creado para facilitar el aprendizaje.</p>
+
+   </footer>
+
+
+   <div id="llmModal" class="modal-overlay hidden">
+
+       <div class="modal-content w-full md:w-3/4 lg:w-1/2">
+
+           <button class="close-button" id="closeModal">&times;</button>
+
+           <h3 class="text-2xl font-bold text-teal-700 mb-4" id="modalPhraseTitle"></h3>
+
+           <div id="modalContent" class="text-stone-700 leading-relaxed">
+
+               <div id="loadingIndicator" class="text-center hidden">
+
+                   <div class="loading-spinner"></div>
+
+                   <p class="mt-2 text-teal-600">Generando información...</p>
+
+               </div>
+
+               <div id="llmResponseText"></div>
+
+           </div>
+
+       </div>
+
+   </div>
+
+
+   <script>
+
+       const phrasesData = [
+
+           { spanish: "Hola", english: "Hello", category: "Greetings" },
+
+           { spanish: "Buenos días", english: "Good morning", category: "Greetings" },
+
+           { spanish: "Buenas tardes", english: "Good afternoon", category: "Greetings" },
+
+           { spanish: "Buenas noches", english: "Good night", category: "Greetings" },
+
+           { spanish: "Gracias", english: "Thank you", category: "Greetings" },
+
+           { spanish: "De nada", english: "You're welcome", category: "Greetings" },
+
+           { spanish: "Por favor", english: "Please", category: "Greetings" },
+
+           { spanish: "Mesa para, por favor", english: "Table for, please", category: "Dining & Ordering" },
+
+           { spanish: "El menú, por favor", english: "The menu, please", category: "Dining & Ordering" },
+
+           { spanish: "Quisiera...", english: "I'd like...", category: "Dining & Ordering" },
+
+           { spanish: "La cuenta, por favor", english: "The check, please", category: "Dining & Ordering" },
+
+           { spanish: "¿Dónde está...?", english: "Where is...?", category: "Directions" },
+
+           { spanish: "¿Cómo llego a...?", english: "How do I get to...?", category: "Directions" },
+
+           { spanish: "¿Cuánto cuesta el taxi?", english: "How much is the taxi?", category: "Transportation" },
+
+           { spanish: "Necesito ayuda.", english: "I need help.", category: "Emergency & Help" },
+
+           { spanish: "¿Cuánto cuesta?", english: "How much does it cost?", category: "Shopping & Money" },
+
+           { spanish: "¿Aceptan tarjeta de crédito?", english: "Do you accept credit cards?", category: "Shopping & Money" },
+
+           { spanish: "Ayuda, por favor.", english: "Help, please.", category: "Emergency & Help" },
+
+           { spanish: "Llame a la policía.", english: "Call the police.", category: "Emergency & Help" },
+
+           { spanish: "Necesito un médico.", english: "I need a doctor.", category: "Emergency & Help" },
+
+           { spanish: "¿Dónde está el hospital?", english: "Where is the hospital?", category: "Emergency & Help" },
+
+           { spanish: "¿Dónde está la estación de autobuses?", english: "Where is the bus station?", category: "Transportation" },
+
+           { spanish: "¿Cuándo llega el próximo tren?", english: "When does the next train arrive?", category: "Transportation" },
+
+           { spanish: "Un billete para San Juan, por favor.", english: "A ticket to San Juan, please.", category: "Transportation" },
+
+           { spanish: "Tengo una reservación.", english: "I have a reservation.", category: "Accommodation" },
+
+           { spanish: "¿Cuánto cuesta por noche?", english: "How much does it cost per night?", category: "Accommodation" },
+
+           { spanish: "Necesito toallas extra, por favor.", english: "I need extra towels, please.", category: "Accommodation" },
+
+           { spanish: "¿A qué hora es el check-out?", english: "What time is check-out?", category: "Accommodation" },
+
+           { spanish: "¿Tienen otra talla?", english: "Do you have another size?", category: "Shopping & Bargaining" },
+
+           { spanish: "¿Puedo probar esto?", english: "Can I try this on?", category: "Shopping & Bargaining" },
+
+           { spanish: "¿Me puede hacer un descuento?", english: "Can you give me a discount?", category: "Shopping & Bargaining" }
+
+       ];
+
+
+       const phraseList = document.getElementById('phraseList');
+
+       const searchInput = document.getElementById('searchInput');
+
+       const categoryFiltersContainer = document.getElementById('categoryFilters');
+
+       const noResultsDiv = document.getElementById('noResults');
+
+       const llmModal = document.getElementById('llmModal');
+
+       const closeModalButton = document.getElementById('closeModal');
+
+       const modalPhraseTitle = document.getElementById('modalPhraseTitle');
+
+       const llmResponseText = document.getElementById('llmResponseText');
+
+       const loadingIndicator = document.getElementById('loadingIndicator');
+
+
+       let currentCategory = 'All';
+
+       let currentSearchTerm = '';
+
+
+       const categoryMap = {
+
+           "Saludos": "Greetings",
+
+           "Restaurante": "Dining & Ordering",
+
+           "Direcciones": "Directions",
+
+           "Compras": "Shopping & Money",
+
+           "Emergencias": "Emergency & Help",
+
+           "Transporte": "Transportation",
+
+           "Alojamiento": "Accommodation",
+
+           "Shopping & Bargaining": "Shopping & Bargaining",
+
+           "All": "Show All"
+
+       };
+
+
+       const categories = ['All', ...new Set(phrasesData.map(p => p.category))];
+
+
+       function renderCategories() {
+
+           categoryFiltersContainer.innerHTML = '';
+
+           categories.forEach(category => {
+
+               const button = document.createElement('button');
+
+               button.textContent = categoryMap[category] || category;
+
+               button.classList.add('filter-button', 'px-4', 'py-2', 'text-sm', 'sm:text-base', 'font-medium', 'rounded-lg', 'shadow-sm', 'bg-teal-100', 'text-teal-700', 'hover:bg-teal-200', 'focus:outline-none', 'focus:ring-2', 'focus:ring-teal-500', 'focus:ring-opacity-50');
+
+               if (category === currentCategory) {
+
+                   button.classList.add('active');
+
+               }
+
+               button.addEventListener('click', () => {
+
+                   currentCategory = category;
+
+                   document.querySelectorAll('.filter-button').forEach(btn => btn.classList.remove('active'));
+
+                   button.classList.add('active');
+
+                   renderPhrases();
+
+               });
+
+               categoryFiltersContainer.appendChild(button);
+
+           });
+
+       }
+
+
+       function renderPhrases() {
+
+           phraseList.innerHTML = '';
+
+           const searchTerm = currentSearchTerm.toLowerCase();
+
+
+           const filteredPhrases = phrasesData.filter(phrase => {
+
+               const matchesCategory = currentCategory === 'All' || phrase.category === currentCategory;
+
+               const matchesSearch = searchTerm === '' ||
+
+                                     phrase.spanish.toLowerCase().includes(searchTerm) ||
+
+                                     phrase.english.toLowerCase().includes(searchTerm);
+
+               return matchesCategory && matchesSearch;
+
+           });
+
+
+           if (filteredPhrases.length === 0) {
+
+               noResultsDiv.classList.remove('hidden');
+
+               phraseList.classList.add('hidden');
+
+           } else {
+
+               noResultsDiv.classList.add('hidden');
+
+               phraseList.classList.remove('hidden');
+
+               filteredPhrases.forEach(phrase => {
+
+                   const card = document.createElement('div');
+
+                   card.classList.add('phrase-card', 'bg-white', 'p-5', 'sm:p-6', 'rounded-xl', 'shadow-lg', 'hover:shadow-xl', 'flex', 'flex-col', 'justify-between');
+
+                 
+
+                   const contentDiv = document.createElement('div');
+
+                   const spanishPhrase = document.createElement('h3');
+
+                   spanishPhrase.classList.add('text-lg', 'sm:text-xl', 'font-semibold', 'text-teal-700', 'mb-2');
+
+                   spanishPhrase.textContent = phrase.spanish;
+
+                 
+
+                   const englishTranslation = document.createElement('p');
+
+                   englishTranslation.classList.add('text-stone-600', 'text-sm', 'sm:text-base', 'mb-3');
+
+                   englishTranslation.textContent = phrase.english;
+
+
+                   const categoryBadge = document.createElement('span');
+
+                   categoryBadge.classList.add('inline-block', 'bg-teal-50', 'text-teal-600', 'text-xs', 'font-medium', 'px-2.5', 'py-0.5', 'rounded-full', 'mb-4');
+
+                   categoryBadge.textContent = categoryMap[phrase.category] || phrase.category;
+
+
+                   contentDiv.appendChild(spanishPhrase);
+
+                   contentDiv.appendChild(englishTranslation);
+
+                   contentDiv.appendChild(categoryBadge);
+
+
+                   const expandButton = document.createElement('button');
+
+                   expandButton.classList.add('mt-auto', 'w-full', 'bg-teal-500', 'hover:bg-teal-600', 'text-white', 'font-bold', 'py-2', 'px-4', 'rounded-lg', 'shadow-md', 'transition-colors', 'duration-200');
+
+                   expandButton.innerHTML = '✨ Expandir Frase';
+
+                   expandButton.addEventListener('click', () => showLlmResponse(phrase.spanish));
+
+
+                   card.appendChild(contentDiv);
+
+                   card.appendChild(expandButton);
+
+                   phraseList.appendChild(card);
+
+               });
+
+           }
+
+       }
+
+
+       async function showLlmResponse(spanishPhrase) {
+
+           llmModal.classList.add('show');
+
+           llmModal.classList.remove('hidden');
+
+           modalPhraseTitle.textContent = `Información Adicional para: "${spanishPhrase}"`;
+
+           llmResponseText.innerHTML = ''; // Clear previous content
+
+           loadingIndicator.classList.remove('hidden'); // Show loading spinner
+
+
+           try {
+
+               const prompt = `Given the Spanish phrase: "${spanishPhrase}", provide a brief explanation of its common usage, one or two alternative ways to say it (if applicable), and a very short example dialogue where it might be used. Format your response clearly with headings for 'Uso Común', 'Alternativas', and 'Diálogo de Ejemplo'. Use Markdown for formatting (e.g., **bold**, *italics*, bullet points).`;
+
+               let chatHistory = [];
+
+               chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+               const payload = { contents: chatHistory };
+
+               const apiKey = "";
+
+               const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+
+               const response = await fetch(apiUrl, {
+
+                   method: 'POST',
+
+                   headers: { 'Content-Type': 'application/json' },
+
+                   body: JSON.stringify(payload)
+
+               });
+
+               const result = await response.json();
+
+
+               if (result.candidates && result.candidates.length > 0 &&
+
+                   result.candidates[0].content && result.candidates[0].content.parts &&
+
+                   result.candidates[0].content.parts.length > 0) {
+
+                   const text = result.candidates[0].content.parts[0].text;
+
+                   llmResponseText.innerHTML = formatMarkdownToHtml(text); // Use helper to format markdown
+
+               } else {
+
+                   llmResponseText.innerHTML = '<p class="text-red-500">Lo siento, no pude generar información adicional para esta frase. Inténtalo de nuevo más tarde.</p>';
+
+               }
+
+           } catch (error) {
+
+               console.error('Error calling Gemini API:', error);
+
+               llmResponseText.innerHTML = '<p class="text-red-500">Ocurrió un error al conectar con el servicio. Por favor, verifica tu conexión a internet o inténtalo de nuevo.</p>';
+
+           } finally {
+
+               loadingIndicator.classList.add('hidden'); // Hide loading spinner
+
+           }
+
+       }
+
+
+       function formatMarkdownToHtml(markdownText) {
+
+           // Basic markdown to HTML conversion for headings, bold, italics, and lists
+
+           let html = markdownText
+
+               .replace(/^### (.*$)/gim, '<h3>$1</h3>') // H3
+
+               .replace(/^## (.*$)/gim, '<h2>$1</h2>')   // H2
+
+               .replace(/^# (.*$)/gim, '<h1>$1</h1>')    // H1
+
+               .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>') // Bold
+
+               .replace(/\*(.*?)\*/gim, '<em>$1</em>')     // Italics
+
+               .replace(/^- (.*$)/gim, '<li>$1</li>');    // List items
+
+
+           // Wrap list items in ul if not already
+
+           if (html.includes('<li>')) {
+
+               html = html.replace(/(<li>.*?<\/li>)/g, '<p>$1</p>'); // Wrap LIs in P for block display
+
+               html = '<ul>' + html.replace(/<\/p><p>/g, '') + '</ul>'; // Remove intermediate P tags and wrap in UL
+
+           }
+
+
+           // Replace newlines with <br> for simple text blocks, but not within list items or headings
+
+           html = html.split('\n').map(line => {
+
+               if (!line.startsWith('<h') && !line.startsWith('<li') && !line.startsWith('<ul>')) {
+
+                   return `<p>${line}</p>`;
+
+               }
+
+               return line;
+
+           }).join('');
+
+         
+
+           // Remove empty paragraph tags that might be created by multiple newlines
+
+           html = html.replace(/<p><\/p>/g, '');
+
+
+           return html;
+
+       }
+
+
+
+       closeModalButton.addEventListener('click', () => {
+
+           llmModal.classList.add('hidden');
+
+           llmModal.classList.remove('show');
+
+       });
+
+
+       // Close modal when clicking outside content
+
+       llmModal.addEventListener('click', (e) => {
+
+           if (e.target === llmModal) {
+
+               llmModal.classList.add('hidden');
+
+               llmModal.classList.remove('show');
+
+           }
+
+       });
+
+
+       searchInput.addEventListener('input', (e) => {
+
+           currentSearchTerm = e.target.value;
+
+           renderPhrases();
+
+       });
+
+
+       document.addEventListener('DOMContentLoaded', () => {
+
+           renderCategories();
+
+           renderPhrases();
+
+       });
+
+   </script>
+
+</body>
+
+</html>
+
+
